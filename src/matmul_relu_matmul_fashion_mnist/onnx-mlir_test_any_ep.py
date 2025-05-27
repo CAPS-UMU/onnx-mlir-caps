@@ -48,8 +48,10 @@ ONNX_MLIR_PATH = "onnx-mlir" # Assumes onnx-mlir executable is in PATH or provid
 RUN_ONNX_MODEL_SCRIPT_PATH = "/workdir/onnx-mlir/utils/RunONNXModel.py" # Absolute path to the script
 # Directory to store temporary files for each inference run, created in the script's CWD
 INFERENCE_TEMP_DIR_BASE = "onnx_mlir_inference_runs"
-CPP_RUNTIME_PATH = "FusedGemmRuntime_omtensor.cpp" # Path to the C++ runtime file
+CPP_RUNTIME_PATH = "FusedGemmRuntime_omtensor_ort.cpp" # Path to the C++ runtime file
 LIBRARY_PATH = "libFusedGemmRuntime_omtensor.so" # Name of the compiled shared library
+ORT_BINARIES_PATH = "/workdir/onnxruntime-linux-x64-gpu-1.21.1"
+ONNX_MLIR_INCLUDE_PATH = "/workdir/onnx-mlir/include"
 
 # Dataset configuration
 BATCH_SIZE = 1
@@ -170,10 +172,10 @@ def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
     # Output .so directly into the COMPILED_MODEL_DIR for simplicity in linking step 3
     fused_so = os.path.join(absolute_output_dir, LIBRARY_PATH)
     
-    onnx_mlir_include = "/workdir/onnx-mlir/include" # For OnnxMlirRuntime.h
+    onnx_mlir_include = ONNX_MLIR_INCLUDE_PATH # For OnnxMlirRuntime.h
     # Adjust these paths if your ONNX Runtime installation is different
-    onnx_runtime_include_dir = "/workdir/onnxruntime-linux-x64-gpu-1.21.1/include"
-    onnx_runtime_lib_dir = "/workdir/onnxruntime-linux-x64-gpu-1.21.1/lib"
+    onnx_runtime_include_dir = os.path.join(ORT_BINARIES_PATH, "include")
+    onnx_runtime_lib_dir     = os.path.join(ORT_BINARIES_PATH, "lib")
 
     if not os.path.exists(fused_cpp):
         print(f"❌ Error: {CPP_RUNTIME_PATH} not found at {fused_cpp}")
