@@ -10,6 +10,7 @@ import subprocess                # standard library, part of Python since 2.7
 import onnx                     # Version: 1.16.1 (latest as of cutoff)
 from onnx import helper, TensorProto
 import numpy as np              # Version: 1.26.4 (latest as of cutoff)
+import argparse, json
 
 ###############################################
 # CONSTANTS & PARAMETERS ######################
@@ -18,22 +19,28 @@ import numpy as np              # Version: 1.26.4 (latest as of cutoff)
 """
 Constants and parameters used in this script.
 """
-OP_TYPE        = 'Gemm'
-OP_DOMAIN      = ''            # Default ONNX domain
-ALPHA          = 1.0
-BETA           = 1.0
-TRANS_A        = 0             # No transpose for A
-TRANS_B        = 1             # Transpose B as obtained
-OPSET_CORE     = 13
-PRODUCER_NAME  = 'gemm-example-producer'
-MODEL_FILENAME = 'gemm_relu.onnx'
-INC_FILENAME   = 'gemm_relu_model.inc'   # Name of the .inc file to generate
-IR_VERSION     = 10           # Intermediate Representation version
+tparser = argparse.ArgumentParser(description="Export Gemm+ReLU ONNX model based on JSON config.")
+tparser.add_argument('--config', type=str, default='config.json', help='Path to JSON config file')
+config_args = tparser.parse_args()
+with open(config_args.config, 'r') as cf:
+    cfg = json.load(cf)
 
-DIMS_A = [1, 784]     # Dimensions for tensor A (input)
-DIMS_B = [128, 784]   # Dimensions for tensor B (input)
-DIMS_C = [128]        # Bias vector (rank-1)
-DIMS_Y = [1, 128]     # Gemm output (and Relu output)
+# Load parameters from config
+OP_TYPE = cfg['export_gemm']['op_type']
+OP_DOMAIN = cfg['export_gemm']['op_domain']
+ALPHA = cfg['export_gemm']['alpha']
+BETA = cfg['export_gemm']['beta']
+TRANS_A = cfg['export_gemm']['transA']
+TRANS_B = cfg['export_gemm']['transB']
+OPSET_CORE = cfg['export_gemm']['opset']
+PRODUCER_NAME = cfg['export_gemm']['producer_name']
+MODEL_FILENAME = cfg['export_gemm']['model_filename']
+INC_FILENAME = cfg['export_gemm']['inc_filename']
+IR_VERSION = cfg['export_gemm']['ir_version']
+DIMS_A = cfg['export_gemm']['dims_A']
+DIMS_B = cfg['export_gemm']['dims_B']
+DIMS_C = cfg['export_gemm']['dims_C']
+DIMS_Y = cfg['export_gemm']['dims_Y']
 
 ##############################################
 # FUNCTION DEFINITIONS #######################

@@ -16,17 +16,17 @@ This script benchmarks a FashionMNIST ONNX model by:
 Libraries and packages used in this script and Versions Info for tools, libraries, and packages used in this script.
 """
 
-import numpy as np          # Version: 
+import numpy as np  # Version:
 import time
-import torch                # Version:
-import torchvision          # Version:
+import torch  # Version:
+import torchvision  # Version:
 import os
-import subprocess           # Version: Python Standard Library
-import sys                  # Version: Python Standard Library
-import shutil               # Version: Python Standard Library
-import json                 # Version: Python Standard Library (Used indirectly via RunONNXModel.py)
-import argparse             # Version: Python Standard Library (Used indirectly via RunONNXModel.py)
-import onnx                 # Version: 
+import subprocess  # Version: Python Standard Library
+import sys  # Version: Python Standard Library
+import shutil  # Version: Python Standard Library
+import json  # Version: Python Standard Library (Used indirectly via RunONNXModel.py)
+import argparse  # Version: Python Standard Library (Used indirectly via RunONNXModel.py)
+import onnx  # Version:
 
 ###############################################
 # CONSTANTS & PARAMETERS ######################
@@ -36,35 +36,47 @@ import onnx                 # Version:
 Constants and parameters used in this script.
 """
 # Parse configuration file
-parser = argparse.ArgumentParser(description="ONNX-MLIR benchmark script based on JSON config.")
-parser.add_argument('--config', type=str, default='config.json', help='Path to JSON config file')
+parser = argparse.ArgumentParser(
+    description="ONNX-MLIR benchmark script based on JSON config."
+)
+parser.add_argument(
+    "--config", type=str, default="config.json", help="Path to JSON config file"
+)
 args = parser.parse_args()
-with open(args.config, 'r') as f:
+with open(args.config, "r") as f:
     config = json.load(f)
 
 # Load parameters from config
-MODEL_PATH = config['export_onnx']['optimized_onnx_fp32_path']
-COMPILED_MODEL_DIR = config['pipeline']['compiled_model_dir']
-DATA_ROOT = config['dataset']['data_root']
-ONNX_MLIR_PATH = config['compile']['onnx_mlir_exec']
-RUN_ONNX_MODEL_SCRIPT_PATH = config['pipeline']['run_onnx_model_script_path']
-INFERENCE_TEMP_DIR_BASE = config['pipeline']['inference_temp_dir_base']
-INC_FILENAME = config['export_gemm']['inc_filename']
-CPP_RUNTIME_PATH = config['compile']['cpp_runtime_path']
-LIBRARY_PATH = config['compile']['library_path']
-ORT_BINARIES_PATH = config['compile']['ort_binaries_path']
-ONNX_MLIR_INCLUDE_PATH = config['compile']['onnx_mlir_include_path']
+MODEL_PATH = config["export_onnx"]["optimized_onnx_fp32_path"]
+COMPILED_MODEL_DIR = config["pipeline"]["compiled_model_dir"]
+DATA_ROOT = config["dataset"]["data_root"]
+ONNX_MLIR_PATH = config["compile"]["onnx_mlir_exec"]
+RUN_ONNX_MODEL_SCRIPT_PATH = config["pipeline"]["run_onnx_model_script_path"]
+INFERENCE_TEMP_DIR_BASE = config["pipeline"]["inference_temp_dir_base"]
+INC_FILENAME = config["export_gemm"]["inc_filename"]
+CPP_RUNTIME_PATH = config["compile"]["cpp_runtime_path"]
+LIBRARY_PATH = config["compile"]["library_path"]
+ORT_BINARIES_PATH = config["compile"]["ort_binaries_path"]
+ONNX_MLIR_INCLUDE_PATH = config["compile"]["onnx_mlir_include_path"]
+ONNX_MLIR_ROOT_PATH = config["compile"]["onnx_mlir_root_path"]
 
-BATCH_SIZE = config['dataset']['batch_size']
-FEATURE_DIM = config['dataset']['feature_dim']
-IMG_SHAPE = tuple(config['dataset']['img_shape'])
-NUM_CLASSES = config['dataset']['num_classes']
+BATCH_SIZE = config["dataset"]["batch_size"]
+FEATURE_DIM = config["dataset"]["feature_dim"]
+IMG_SHAPE = tuple(config["dataset"]["img_shape"])
+NUM_CLASSES = config["dataset"]["num_classes"]
 
-NUM_ITERATIONS = config['benchmark']['num_iterations']
-WARMUP_ITERATIONS = config['benchmark']['warmup_iterations']
-CLASS_NAMES = config['dataset']['class_names']
-EXECUTION_PROVIDER = config['benchmark']['ort_provider']
-ONNX_MLIR_ROOT_PATH = config['compile']['onnx_mlir_root_path']
+NUM_ITERATIONS = config["benchmark"]["num_iterations"]
+WARMUP_ITERATIONS = config["benchmark"]["warmup_iterations"]
+CLASS_NAMES = config["dataset"]["class_names"]
+EXECUTION_PROVIDER = config["benchmark"]["ort_provider"]
+
+# Hardcoded RISC-V compiler and flags
+RISC_CLANG = config["compile"]["risc_clang"]
+RISC_FLAGS = config["compile"]["risc_flags"]
+RISC_TOOLCHAIN = config["compile"]["risc_toolchain"]
+RISC_SYSROOT = config["compile"]["risc_sysroot"]
+RISC_OUTPUT_NAME = config["compile"]["risc_output_name"]
+RISC_MATMUL_SRC = config["compile"]["risc_matmul_source"]
 
 print("Starting ONNX-MLIR benchmark script (using RunONNXModel.py via subprocess)")
 
@@ -93,7 +105,8 @@ def find_executable(name, default_path):
         return os.path.abspath(found_path)
 
     print(f"❌ Error: '{name}' not found at '{default_path}' or in system PATH.")
-    sys.exit(1) # Exit if executable not found
+    sys.exit(1)  # Exit if executable not found
+
 
 def find_script(name, default_path):
     """
@@ -108,14 +121,18 @@ def find_script(name, default_path):
     """
     absolute_path = os.path.abspath(default_path)
     if os.path.exists(absolute_path) and os.path.isfile(absolute_path):
-         print(f"✅ Found script '{name}' at specified path: {absolute_path}")
-         return absolute_path
-    print(f"❌ Error: Script '{name}' not found at '{default_path}' (abs: {absolute_path}). Please provide the correct path.")
-    sys.exit(1) # Exit if script not found
+        print(f"✅ Found script '{name}' at specified path: {absolute_path}")
+        return absolute_path
+    print(
+        f"❌ Error: Script '{name}' not found at '{default_path}' (abs: {absolute_path}). Please provide the correct path."
+    )
+    sys.exit(1)  # Exit if script not found
+
 
 def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
     """
-    Compiles an ONNX model using onnx-mlir, then compiles and links with CPP_RUNTIME_PATH.
+    Compiles an ONNX model using onnx-mlir, then compiles and links with
+    a custom RISC-V runtime FusedGemm (matmu_rvvlib + FusedGemmRuntime_omtensor_riscv.cpp).
     """
     print(f"Compiling ONNX model '{onnx_model_path}' with onnx-mlir...")
     absolute_onnx_model_path = os.path.abspath(onnx_model_path)
@@ -142,19 +159,26 @@ def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
         onnx_mlir_exec_path,
         "--EmitObj",
         absolute_onnx_model_path,
-        "-o", output_base_name
+        "-o",
+        output_base_name,
     ]
     print(f"Running command: {' '.join(compile_command)}")
     try:
-        result = subprocess.run(compile_command, check=True, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            compile_command, check=True, capture_output=True, text=True, timeout=300
+        )
         print("✅ ONNX-MLIR object emission successful.")
         if not os.path.exists(expected_obj_path):
-            print(f"❌ Error: Compiled object '{expected_obj_path}' not found after compilation.")
+            print(
+                f"❌ Error: Compiled object '{expected_obj_path}' not found after compilation."
+            )
             print("Compiler Stdout:\n", result.stdout)
             print("Compiler Stderr:\n", result.stderr)
             return False, None
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error: ONNX-MLIR object emission failed with CalledProcessError: {e}")
+        print(
+            f"❌ Error: ONNX-MLIR object emission failed with CalledProcessError: {e}"
+        )
         print("Compiler Stdout:\n", e.stdout)
         print("Compiler Stderr:\n", e.stderr)
         return False, None
@@ -162,41 +186,40 @@ def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
         print(f"❌ Error: ONNX-MLIR object emission failed: {e}")
         return False, None
 
-    # Step 2: Compile CPP_RUNTIME_PATH to shared library
-    fused_cpp = os.path.abspath(CPP_RUNTIME_PATH)
-    # Output .so directly into the COMPILED_MODEL_DIR for simplicity in linking step 3
+    # Step 2: Compile RISC-V C++ runtime into a shared object
+    fused_cpp = os.path.abspath(CPP_RUNTIME_PATH)  # FusedGemmRuntime_omtensor_riscv.cpp
     fused_so = os.path.join(absolute_output_dir, LIBRARY_PATH)
-    
-    onnx_mlir_include = ONNX_MLIR_INCLUDE_PATH # For OnnxMlirRuntime.h
-    # Adjust these paths if your ONNX Runtime installation is different
-    onnx_runtime_include_dir = os.path.join(ORT_BINARIES_PATH, "include")
-    onnx_runtime_lib_dir     = os.path.join(ORT_BINARIES_PATH, "lib")
 
-    if not os.path.exists(fused_cpp):
-        print(f"❌ Error: {CPP_RUNTIME_PATH} not found at {fused_cpp}")
-        return False, None
-    
-    # Insert macro define for Fused include filename
-    inc_def = f'-DFUSED_INCL_FILENAME=\"{INC_FILENAME}\"'
-    clang_compile_cmd = ["clang++", inc_def, "-fPIC", "-shared", f"-I{onnx_mlir_include}", f"-I{onnx_runtime_include_dir}", "-o", fused_so, fused_cpp, f"-L{onnx_runtime_lib_dir}", "-lonnxruntime", f"-Wl,-rpath,{onnx_runtime_lib_dir}"]
-    print(f"Compiling {CPP_RUNTIME_PATH}: {' '.join(clang_compile_cmd)}")
+    clang_compile_cmd = [
+        RISC_CLANG,
+        *RISC_FLAGS,
+        "-o",
+        RISC_OUTPUT_NAME,
+        RISC_MATMUL_SRC,  # bring in matmu implementation
+        fused_cpp,  # FusedGemmRuntime_omtensor_riscv.cpp
+        f"--gcc-toolchain={RISC_TOOLCHAIN}",
+        f"--sysroot={RISC_SYSROOT}",
+    ]
+    print(f"Compiling RISC-V runtime: {' '.join(clang_compile_cmd)}")
     try:
-        result = subprocess.run(clang_compile_cmd, check=True, capture_output=True, text=True, timeout=120)
-        print(f"✅ {CPP_RUNTIME_PATH} compilation successful.")
+        result = subprocess.run(
+            clang_compile_cmd, check=True, capture_output=True, text=True, timeout=180
+        )
+        print("✅ RISC-V runtime compilation successful.")
+        # move or rename vect_matmul -> fused_so
+        shutil.move(RISC_OUTPUT_NAME, fused_so)
         if not os.path.exists(fused_so):
-            print(f"❌ Error: Compiled shared library '{fused_so}' not found after successful compilation command.")
-            print("Compiler Stdout:\n", result.stdout) # Should not happen if check=True
-            print("Compiler Stderr:\n", result.stderr) # Should not happen if check=True
+            print(
+                f"❌ Error: RISC-V shared library '{fused_so}' not found after compilation."
+            )
             return False, None
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error: {CPP_RUNTIME_PATH} compilation failed with CalledProcessError.")
-        print(f"Command: {' '.join(e.cmd)}")
-        print("Return code:", e.returncode)
-        print("Compiler Stdout:\n", e.stdout)
-        print("Compiler Stderr:\n", e.stderr)
+        print("❌ Error: RISC-V runtime compilation failed.")
+        print("Stdout:\n", e.stdout)
+        print("Stderr:\n", e.stderr)
         return False, None
     except Exception as e:
-        print(f"❌ Error: {CPP_RUNTIME_PATH} compilation failed with an unexpected Exception: {e}")
+        print(f"❌ Error: Unexpected exception during RISC-V compilation: {e}")
         return False, None
 
     # Step 3: Link ONNX-MLIR object and FusedGemmRuntime_omtensor.so into final model.so
@@ -206,16 +229,23 @@ def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
         "clang++",
         expected_obj_path,
         fused_so,
-        "-o", expected_lib_path,
-        "-shared", "-fPIC",
-        f"-L{onnx_mlir_lib_dir}", "-lcruntime",
+        "-o",
+        expected_lib_path,
+        "-shared",
+        "-fPIC",
+        f"-L{onnx_mlir_lib_dir}",
+        "-lcruntime",
     ]
     print(f"Linking model and FusedGemmRuntime_omtensor.so: {' '.join(clang_link_cmd)}")
     try:
-        result = subprocess.run(clang_link_cmd, check=True, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            clang_link_cmd, check=True, capture_output=True, text=True, timeout=120
+        )
         print("✅ Linking successful.")
         if not os.path.exists(expected_lib_path):
-            print(f"❌ Error: Linked library '{expected_lib_path}' not found after linking.")
+            print(
+                f"❌ Error: Linked library '{expected_lib_path}' not found after linking."
+            )
             print("Linker Stdout:\n", result.stdout)
             print("Linker Stderr:\n", result.stderr)
             return False, None
@@ -231,7 +261,10 @@ def compile_onnx_model(onnx_model_path, output_dir, onnx_mlir_exec_path):
         print(f"❌ Error: Linking failed: {e}")
         return False, None
 
-def run_inference_with_script(run_script_path, compiled_model_dir_path, input_data_list, output_dir):
+
+def run_inference_with_script(
+    run_script_path, compiled_model_dir_path, input_data_list, output_dir
+):
     """
     Runs inference by calling the RunONNXModel.py script via subprocess.
     Assumes compiled model is 'model.so' inside compiled_model_dir_path.
@@ -255,18 +288,22 @@ def run_inference_with_script(run_script_path, compiled_model_dir_path, input_da
     # Ensure paths are absolute
     absolute_run_script_path = os.path.abspath(run_script_path)
     absolute_compiled_model_dir = os.path.abspath(compiled_model_dir_path)
-    absolute_output_dir = os.path.abspath(output_dir) # Dir for this run's I/O
+    absolute_output_dir = os.path.abspath(output_dir)  # Dir for this run's I/O
 
     # --- Basic Checks ---
     if not os.path.exists(absolute_run_script_path):
         print(f"❌ Error: Run script not found at: {absolute_run_script_path}")
         return None, 0
     if not os.path.isdir(absolute_compiled_model_dir):
-        print(f"❌ Error: Compiled model directory not found or not a directory: {absolute_compiled_model_dir}")
+        print(
+            f"❌ Error: Compiled model directory not found or not a directory: {absolute_compiled_model_dir}"
+        )
         return None, 0
     expected_model_so_path = os.path.join(absolute_compiled_model_dir, "model.so")
     if not os.path.exists(expected_model_so_path):
-        print(f"❌ Error: Expected compiled model 'model.so' not found in: {absolute_compiled_model_dir}")
+        print(
+            f"❌ Error: Expected compiled model 'model.so' not found in: {absolute_compiled_model_dir}"
+        )
         return None, 0
     # --- End Basic Checks ---
 
@@ -311,18 +348,22 @@ while True:
         # print(f"   Saved loader script to {loader_script_path}") # Optional debug print
 
     except Exception as e:
-        print(f"❌ Error preparing input files/loader script in {absolute_output_dir}: {e}")
+        print(
+            f"❌ Error preparing input files/loader script in {absolute_output_dir}: {e}"
+        )
         return None, 0
     # --- End Input Preparation ---
-
 
     # Construct the command for RunONNXModel.py
     run_command = [
         sys.executable,
         absolute_run_script_path,
-        "--load-model", absolute_compiled_model_dir, # Pass the DIRECTORY containing model.so
-        "--save-ref", absolute_output_dir,           # Save outputs to this run's dir
-        "--load-ref-from-numpy", loader_script_path  # Use the loader script
+        "--load-model",
+        absolute_compiled_model_dir,  # Pass the DIRECTORY containing model.so
+        "--save-ref",
+        absolute_output_dir,  # Save outputs to this run's dir
+        "--load-ref-from-numpy",
+        loader_script_path,  # Use the loader script
     ]
 
     print(f"Running inference command: {' '.join(run_command)}")
@@ -332,13 +373,23 @@ while True:
     # Run the script with cwd set to the specified output directory
     env = os.environ.copy()
     if "ONNX_MLIR_HOME" not in env:
-            print("⚠️ Warning: ONNX_MLIR_HOME environment variable not found. RunONNXModel.py might fail.")
-            # Consider adding ONNX_MLIR_HOME if known and missing? For now, just warn.
+        print(
+            "⚠️ Warning: ONNX_MLIR_HOME environment variable not found. RunONNXModel.py might fail."
+        )
+        # Consider adding ONNX_MLIR_HOME if known and missing? For now, just warn.
     # Set the execution provider for ONNX Runtime (to be used by RunONNXModel.py)
     env["ONNX_MLIR_EP"] = EXECUTION_PROVIDER
 
     start_time = time.time()
-    result = subprocess.run(run_command, check=True, capture_output=True, text=True, cwd=absolute_output_dir, timeout=60, env=env)
+    result = subprocess.run(
+        run_command,
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=absolute_output_dir,
+        timeout=60,
+        env=env,
+    )
     end_time = time.time()
     # print("RunONNXModel Output:\n", result.stdout) # Often empty on success
     # print("RunONNXModel Stderr:\n", result.stderr) # Check stderr for potential info
@@ -349,7 +400,9 @@ while True:
     while True:
         # Look for output files in the absolute_output_dir (where --save-ref saved them)
         # RunONNXModel.py saves outputs as output_0.pb, output_1.pb etc. with --save-ref
-        output_path = os.path.join(absolute_output_dir, f"output_{i}.pb") # <-- Changed extension to .pb
+        output_path = os.path.join(
+            absolute_output_dir, f"output_{i}.pb"
+        )  # <-- Changed extension to .pb
 
         if os.path.exists(output_path):
             try:
@@ -362,29 +415,31 @@ while True:
                 loaded_outputs.append(output_np)
                 print(f"   ✅ Loaded output file: {output_path}")
                 i += 1
-            except Exception as load_err: # Use more specific exception if possible
+            except Exception as load_err:  # Use more specific exception if possible
                 print(f"   ⚠️ Error loading output file {output_path}: {load_err}")
-                loaded_outputs = None # Mark as failed if loading fails
+                loaded_outputs = None  # Mark as failed if loading fails
                 break
         else:
             # Stop if output_i.pb is not found.
             # If i is 0, it means no output files (output_0.pb) were found at all.
-            break # Exit the while loop
+            break  # Exit the while loop
 
     if not loaded_outputs:
-            # This warning now means the script ran successfully but didn't produce
-            # output_0.pb in the specified directory.
-            print(f"⚠️ Warning: No valid output files (e.g., output_0.pb) found or loaded from directory: {absolute_output_dir}")
-            # Print stdout/stderr from the script to help debug why it didn't save output
-            print("RunONNXModel stdout:\n", result.stdout)
-            print("RunONNXModel stderr:\n", result.stderr)
-            # exit message and exit program
-            print("❌ Exiting due to missing output files.")
-            exit(1)
+        # This warning now means the script ran successfully but didn't produce
+        # output_0.pb in the specified directory.
+        print(
+            f"⚠️ Warning: No valid output files (e.g., output_0.pb) found or loaded from directory: {absolute_output_dir}"
+        )
+        # Print stdout/stderr from the script to help debug why it didn't save output
+        print("RunONNXModel stdout:\n", result.stdout)
+        print("RunONNXModel stderr:\n", result.stderr)
+        # exit message and exit program
+        print("❌ Exiting due to missing output files.")
+        exit(1)
 
-    
     elapsed_time = end_time - start_time
     return loaded_outputs, elapsed_time
+
 
 ##################################################################################
 # MAIN PROGRAM ###################################################################
@@ -402,11 +457,12 @@ if __name__ == "__main__":
     # Create a base directory for all inference runs in the current working directory
     abs_inference_base_dir = os.path.abspath(INFERENCE_TEMP_DIR_BASE)
     if os.path.exists(abs_inference_base_dir):
-        print(f"Removing existing base inference output directory: {abs_inference_base_dir}")
+        print(
+            f"Removing existing base inference output directory: {abs_inference_base_dir}"
+        )
         shutil.rmtree(abs_inference_base_dir)
     os.makedirs(abs_inference_base_dir, exist_ok=True)
     print(f"Created base directory for inference outputs: {abs_inference_base_dir}")
-
 
     #########################################
     # CHECK PREREQUISITES ###################
@@ -417,7 +473,9 @@ if __name__ == "__main__":
 
     # No need to check absolute_run_script again, find_script exits if not found
     if not os.path.exists(MODEL_PATH):
-        print(f"❌ Error: Input ONNX model not found at '{MODEL_PATH}'. Please set the MODEL_PATH constant.")
+        print(
+            f"❌ Error: Input ONNX model not found at '{MODEL_PATH}'. Please set the MODEL_PATH constant."
+        )
         sys.exit(1)
     print("✅ Prerequisites check passed.")
 
@@ -427,14 +485,15 @@ if __name__ == "__main__":
     # compile_onnx_model now returns the absolute path to the *directory* containing model.so
     compilation_success, absolute_compiled_model_dir = compile_onnx_model(
         MODEL_PATH,
-        COMPILED_MODEL_DIR, # Pass the desired output directory name
-        onnx_mlir_executable
+        COMPILED_MODEL_DIR,  # Pass the desired output directory name
+        onnx_mlir_executable,
     )
     if not compilation_success:
         print("❌ Exiting due to compilation failure.")
         sys.exit(1)
-    print(f"✅ Model compiled successfully. Library 'model.so' is in: {absolute_compiled_model_dir}")
-
+    print(
+        f"✅ Model compiled successfully. Library 'model.so' is in: {absolute_compiled_model_dir}"
+    )
 
     #########################################
     # DATASET LOADING #######################
@@ -444,9 +503,11 @@ if __name__ == "__main__":
         root=DATA_ROOT,
         train=False,
         download=True,
-        transform=torchvision.transforms.ToTensor()
+        transform=torchvision.transforms.ToTensor(),
     )
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=False) # Use shuffle=False for consistency
+    test_loader = torch.utils.data.DataLoader(
+        test_data, batch_size=BATCH_SIZE, shuffle=False
+    )  # Use shuffle=False for consistency
     print("✅ Dataset loaded.")
 
     #########################################
@@ -462,11 +523,11 @@ if __name__ == "__main__":
             img, label = next(test_loader_iter)
         except StopIteration:
             print("Warning: Reached end of dataset during preloading.")
-            break # Stop preloading if dataset ends early
+            break  # Stop preloading if dataset ends early
 
         # Prepare input as expected by the model (flattened float32 numpy array)
         img_np = img.reshape(BATCH_SIZE, FEATURE_DIM).numpy().astype(np.float32)
-        label_np = label.numpy() # Keep label as numpy scalar/array
+        label_np = label.numpy()  # Keep label as numpy scalar/array
         test_samples.append((img_np, label_np))
 
         if i == 0:
@@ -476,10 +537,14 @@ if __name__ == "__main__":
     actual_bench_iters = min(NUM_ITERATIONS, len(test_samples) - actual_warmup_iters)
 
     if len(test_samples) < WARMUP_ITERATIONS + NUM_ITERATIONS:
-         print(f"⚠️ Warning: Loaded only {len(test_samples)} samples, less than requested {WARMUP_ITERATIONS + NUM_ITERATIONS}.")
-         print(f"Adjusting: Warmup={actual_warmup_iters}, Benchmark={actual_bench_iters}")
+        print(
+            f"⚠️ Warning: Loaded only {len(test_samples)} samples, less than requested {WARMUP_ITERATIONS + NUM_ITERATIONS}."
+        )
+        print(
+            f"Adjusting: Warmup={actual_warmup_iters}, Benchmark={actual_bench_iters}"
+        )
 
-    if actual_bench_iters <= 0 and actual_warmup_iters <=0:
+    if actual_bench_iters <= 0 and actual_warmup_iters <= 0:
         print("❌ Error: No samples loaded for benchmarking or warmup. Exiting.")
         sys.exit(1)
 
@@ -501,19 +566,21 @@ if __name__ == "__main__":
             # Create a unique subdirectory for this warmup run
             run_output_dir = os.path.join(abs_inference_base_dir, f"warmup_{i}")
             # Pass the absolute path to the directory containing model.so
-            outputs, _ = run_inference_with_script( # Ignore time for warmup
-                absolute_run_script, absolute_compiled_model_dir, [img_np], run_output_dir
+            outputs, _ = run_inference_with_script(  # Ignore time for warmup
+                absolute_run_script,
+                absolute_compiled_model_dir,
+                [img_np],
+                run_output_dir,
             )
             # Check for failure even in warmup
             if outputs is None:
-                 print(f"❌ Warmup inference failed for sample {i}. Stopping.")
-                 inference_failed = True
-                 break
+                print(f"❌ Warmup inference failed for sample {i}. Stopping.")
+                inference_failed = True
+                break
         if not inference_failed:
             print(f"✅ Completed {actual_warmup_iters} warmup iterations.")
     else:
         print("Skipping warmup phase (0 iterations).")
-
 
     # --- Benchmarking Phase ---
     if not inference_failed and actual_bench_iters > 0:
@@ -528,38 +595,53 @@ if __name__ == "__main__":
 
             # Time the inference script call, passing the absolute path to the model directory
             outputs, elapsed_time = run_inference_with_script(
-                absolute_run_script, absolute_compiled_model_dir, [img_np], run_output_dir
+                absolute_run_script,
+                absolute_compiled_model_dir,
+                [img_np],
+                run_output_dir,
             )
 
             if outputs is None:
-                print(f"❌ Inference failed for sample {sample_index}. Stopping benchmark.")
+                print(
+                    f"❌ Inference failed for sample {sample_index}. Stopping benchmark."
+                )
                 inference_failed = True
-                break # Stop benchmarking loop on failure
+                break  # Stop benchmarking loop on failure
 
             total_time += elapsed_time
 
             # Process prediction (outside timing loop)
             # Check if outputs is a non-empty list containing at least one numpy array
-            if outputs and isinstance(outputs, list) and len(outputs) > 0 and isinstance(outputs[0], np.ndarray):
+            if (
+                outputs
+                and isinstance(outputs, list)
+                and len(outputs) > 0
+                and isinstance(outputs[0], np.ndarray)
+            ):
                 # Assuming the first output contains the logits
                 try:
-                    pred = np.argmax(outputs[0], axis=1) # Get predicted class index
+                    pred = np.argmax(outputs[0], axis=1)  # Get predicted class index
                     # Compare prediction with the ground truth label
-                    if pred == label_np: # Assumes label_np is a scalar or 1-element array
+                    if (
+                        pred == label_np
+                    ):  # Assumes label_np is a scalar or 1-element array
                         correct_predictions += 1
                 except IndexError:
-                     # Handle cases where argmax might fail (e.g., unexpected output shape)
-                     print(f"⚠️ Error processing output for sample {sample_index}. Output shape: {outputs[0].shape}")
+                    # Handle cases where argmax might fail (e.g., unexpected output shape)
+                    print(
+                        f"⚠️ Error processing output for sample {sample_index}. Output shape: {outputs[0].shape}"
+                    )
             else:
-                 # This case is hit if run_inference_with_script returned an empty list or None
-                 # (though the None case should have been caught earlier)
-                 print(f"⚠️ No valid output data loaded for sample {sample_index}, cannot check accuracy.")
+                # This case is hit if run_inference_with_script returned an empty list or None
+                # (though the None case should have been caught earlier)
+                print(
+                    f"⚠️ No valid output data loaded for sample {sample_index}, cannot check accuracy."
+                )
 
         if not inference_failed:
             print(f"✅ Completed {actual_bench_iters} benchmarking iterations.")
     elif not inference_failed:
         print("Skipping benchmarking phase (0 iterations).")
-
 
     #########################################
     # RESULTS REPORTING #####################
@@ -571,7 +653,11 @@ if __name__ == "__main__":
     elif actual_bench_iters > 0:
         avg_time_ms = (total_time / actual_bench_iters) * 1000
         # Ensure accuracy calculation avoids division by zero if correct_predictions is somehow > 0 but actual_bench_iters is 0
-        accuracy = (correct_predictions / actual_bench_iters) * 100 if actual_bench_iters > 0 else 0
+        accuracy = (
+            (correct_predictions / actual_bench_iters) * 100
+            if actual_bench_iters > 0
+            else 0
+        )
         # Ensure throughput calculation avoids division by zero
         throughput = actual_bench_iters / total_time if total_time > 0 else 0
 
@@ -582,7 +668,9 @@ if __name__ == "__main__":
         print(f"Accuracy: {accuracy:.2f}%")
         print(f"Total Inference Script Time: {total_time:.3f} s")
         print(f"Avg. Inference Script Time: {avg_time_ms:.3f} ms/inference")
-        print(f"Throughput: {throughput:.2f} inferences/second (including overhead of running external file)")
+        print(
+            f"Throughput: {throughput:.2f} inferences/second (including overhead of running external file)"
+        )
         print(f"Input/Output files stored under: {abs_inference_base_dir}")
     else:
         print("No benchmark iterations were successfully run.")

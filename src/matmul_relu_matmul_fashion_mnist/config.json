@@ -1,0 +1,65 @@
+{
+  "dataset": {
+    "data_root": "data",
+    "model_params_path": "fasionmnist_mlp_params.pkl",
+    "batch_size": 1,
+    "feature_dim": 784,
+    "img_shape": [1, 28, 28],
+    "num_classes": 10,
+    "class_names": [
+      "T-shirt/top",
+      "Trouser",
+      "Pullover",
+      "Dress",
+      "Coat",
+      "Sandal",
+      "Shirt",
+      "Sneaker",
+      "Bag",
+      "Ankle boot"
+    ]
+  },
+  "export_onnx": {
+    "onnx_fp32_path": "mnist_model_cpu_initial.onnx",
+    "optimized_onnx_fp32_path": "mnist_model_cpu_optimized.onnx",
+    "opset_version": 11
+  },
+  "device": {
+    "device": "cpu"
+  },
+  "benchmark": {
+    "ort_provider": "CPUExecutionProvider",
+    "num_iterations": 10,
+    "warmup_iterations": 10
+  },
+  "export_gemm": {
+    "op_type": "Gemm",
+    "op_domain": "",
+    "alpha": 1.0,
+    "beta": 1.0,
+    "transA": 0,
+    "transB": 1,
+    "opset": 13,
+    "producer_name": "gemm-example-producer",
+    "model_filename": "gemm_relu.onnx",
+    "inc_filename": "gemm_relu_model.inc",
+    "ir_version": 10,
+    "dims_A": [1, 784],
+    "dims_B": [128, 784],
+    "dims_C": [128],
+    "dims_Y": [1, 128]
+  },
+  "pipeline": {
+    "compiled_model_dir": "compiled_model_onnx_mlir",
+    "run_onnx_model_script_path": "/workdir/onnx-mlir/utils/RunONNXModel.py",
+    "inference_temp_dir_base": "inference_runs"
+  },
+  "compile": {
+    "onnx_mlir_exec": "onnx-mlir",
+    "cpp_runtime_path": "FusedGemmRuntime_omtensor_ort.cpp",
+    "library_path": "FusedGemmRuntime_omtensor_ort.so",
+    "ort_binaries_path": "/workdir/onnxruntime-linux-x64-gpu-1.21.1",
+    "onnx_mlir_include_path": "/workdir/onnx-mlir/include",
+    "onnx_mlir_root_path" : "/workdir/onnx-mlir"
+  }
+}

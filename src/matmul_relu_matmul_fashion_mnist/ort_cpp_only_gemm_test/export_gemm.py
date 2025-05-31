@@ -16,7 +16,7 @@ Constants and parameters used in this script.
 """
 # ONNX Model Parameters
 OP_TYPE = 'Gemm'
-OP_DOMAIN = ''  # Default ONNX domain can be indicated as empty string
+OP_DOMAIN = ''  # Default ONNX domain
 ALPHA = 1.0
 BETA = 1.0
 TRANS_A = 0  # No transpose for A
