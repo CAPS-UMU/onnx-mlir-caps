@@ -3,7 +3,7 @@
 
 # [ONNX-MLIR](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#onnx-mlir)
 
-# [Artifact Abstract CGO 2026](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#artifact-abstract-cgo-2026)
+# [CGO 2026: Artifact Abstract](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#artifact-abstract-cgo-2026)
 
 # ONNX-MLIR
 
