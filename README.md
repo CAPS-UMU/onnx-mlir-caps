@@ -1,6 +1,10 @@
 <!--- SPDX-License-Identifier: Apache-2.0 -->
 <p align="center"><img width="50%" src="docs/logo/onnx-mlir-1280x640.png" /></p>
 
+# [ONNX-MLIR](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#onnx-mlir)
+
+# [Artifact Abstract CGO 2026](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#artifact-abstract-cgo-2026)
+
 # ONNX-MLIR
 
 This project (https://onnx.ai/onnx-mlir/) provides compiler technology to transform a valid Open Neural Network Exchange (ONNX) graph into code that implements the graph with minimum runtime support.
