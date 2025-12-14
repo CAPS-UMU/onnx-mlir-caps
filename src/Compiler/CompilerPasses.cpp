@@ -39,9 +39,34 @@
 #include "src/Dialect/ONNX/ONNXDialect.hpp"
 #include "src/Pass/Passes.hpp"
 
+#include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/Passes.h"
+
 using namespace mlir;
 
 namespace onnx_mlir {
+
+  llvm::cl::opt<int> vlen(
+        "vlen",
+        llvm::cl::desc("affine vector lenght"),
+        llvm::cl::init(4));
+
+        llvm::cl::opt<int> uf1(
+          "uf1",
+          llvm::cl::desc("affine vector lenght"),
+          llvm::cl::init(4));
+
+          llvm::cl::opt<int> uf2(
+            "uf2",
+            llvm::cl::desc("affine vector lenght"),
+            llvm::cl::init(4));
+
+            llvm::cl::opt<int> uf3(
+              "uf3",
+              llvm::cl::desc("affine vector lenght"),
+              llvm::cl::init(4));
 
 void configurePasses() {
   // Handle deprecated mcpu.
@@ -213,8 +238,15 @@ void addONNXToKrnlPasses(mlir::PassManager &pm, int optLevel, bool enableCSE,
 }
 
 void addKrnlToAffinePasses(mlir::PassManager &pm) {
+  int veln_v = vlen.getValue();
+  int uf1_v = uf1.getValue();
+  int uf2_v = uf2.getValue();
+  int uf3_v = uf3.getValue();
+
+
+
   pm.addNestedPass<func::FuncOp>(
-      onnx_mlir::krnl::createConvertKrnlToAffinePass());
+      onnx_mlir::krnl::createConvertKrnlToAffinePass(veln_v, uf1_v, uf2_v, uf3_v));
 }
 
 void addKrnlToLLVMPasses(
@@ -224,6 +256,7 @@ void addKrnlToLLVMPasses(
     // TODO: enable this by default when we make sure it works flawlessly.
     pm.addPass(mlir::createCSEPass());
   pm.addNestedPass<func::FuncOp>(mlir::createConvertVectorToSCFPass());
+  pm.addNestedPass<func::FuncOp>(mlir::createConvertVectorToLLVMPass());
   pm.addPass(mlir::createLowerAffinePass());
 
   // Early introduction of omp causes problems with bufferization, delay for
