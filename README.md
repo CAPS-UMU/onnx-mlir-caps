@@ -4,6 +4,8 @@
 # [ONNX-MLIR](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#onnx-mlir)
 
 # [CGO 2026: Artifact Abstract](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#artifact-abstract-cgo-2026)
+For details check branch [`oml-vect-cgo-2026`](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/oml-vect-cgo-2026?tab=readme-ov-file)
+`git checkout oml-vect-cgo-2026`
 
 # ONNX-MLIR
 
@@ -285,7 +287,7 @@ Details of all generated CSV files are shown in the table above for both x86 and
 We expect OML-vect will autovectorize the code and reduce the execution time, but the performance improvements may vary across different hardware platforms, since the vector width and unroll-and-jam factor are hardware-dependent.
 
 ## Reusability
-The following instructions summarize how to reproduce the OML-vect workflow. See the README file in the [GitHub repository](https://github.com/onnx/onnx-mlir) and the Docker image `shreyasubhash/omlvect:reusable`
+The following instructions summarize how to reproduce the OML-vect workflow. See the README file in the [GitHub repository](https://github.com/onnx/onnx-mlir) and branch [`oml-vect-cgo-2026`](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/oml-vect-cgo-2026?tab=readme-ov-file) and the Docker image `shreyasubhash/omlvect:reusable`
 
 ### OML-vect toolchain workflow
 
