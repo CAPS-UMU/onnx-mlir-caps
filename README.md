@@ -1,6 +1,10 @@
 <!--- SPDX-License-Identifier: Apache-2.0 -->
 <p align="center"><img width="50%" src="docs/logo/onnx-mlir-1280x640.png" /></p>
 
+# [ONNX-MLIR](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#onnx-mlir)
+
+# [CGO 2026: Artifact Abstract](https://github.com/CAPS-UMU/onnx-mlir-caps/tree/main?tab=readme-ov-file#artifact-abstract-cgo-2026)
+
 # ONNX-MLIR
 
 This project (https://onnx.ai/onnx-mlir/) provides compiler technology to transform a valid Open Neural Network Exchange (ONNX) graph into code that implements the graph with minimum runtime support.
@@ -169,3 +173,240 @@ The ONNX-MLIR code of conduct is described at https://onnx.ai/codeofconduct.html
 ## Projects related/using onnx-mlir
 
 * The [onnx-mlir-serving](https://github.com/IBM/onnx-mlir-serving) project implements a GRPC server written with C++ to serve onnx-mlir compiled models. Benefiting from C++ implementation, ONNX Serving has very low latency overhead and high throughput.
+
+
+# Artifact Abstract CGO 2026
+This is the supporting artifact for the paper titled "Enabling Automatic Compiler-Driven Vectorization of Transformers" as published in CGO 2026. It includes the source code for the proposed tool (oml-vect), along with scripts to compile and reproduce all experimental results presented in the paper. We provide a Docker image containing all necessary dependencies preinstalled, enabling straightforward setup and execution of the experiments. The setup supports running the experiments on an x86 host, and it also allows cross-compilation for RISC-V ISA, and it automatically transfers the statically linked RISC-V binaries to the host to be then copied to the RISC-V target via scp. The reported results were obtained on Intel Xeon an x86\_64 Intel(R) Xeon(R) E5-2630 v4 CPU @ 2.20GHz and a Xilinx U55C FPGA emulating an Atrevido 423 RISC-V 64-bit core with a 512-bit vector unit.
+
+# Artifact check-list (meta-information)
+
+
+
+1.  **Algorithm:** Data-layout optimization and reduction identification to enable auto-vectorization in MLIR
+2.  **Program:** ONNX graph representations of transformer and neural network models
+3. **Compilation:** Publicly available and included in this artifact: LLVM v20.0, MLIR v20.0, and ORT v1.23.2
+4. **Transformations:** onnx-mlir toolchain to obtain vectorized affine dialect code for each kernel and LLVM to statically compile binaries for x86 and RISC-V, included in this artifact
+- **Binary:** Linux executables for x86 and RISC-V included in this artifact and scripts to generate these binaries automatically.
+- **Data set:** Included in this artifact, testing datasets used for all models are detailed in the corresponding references
+- **Run-time environment:**
+  - x86 - The Docker container (see x86 Experiment workflow section)
+  - RISC-V - The Docker container to cross-compile binaries and RISC-V CPU with Linux OS to run the binaries (see RISC-V Experiment workflow section)
+- **Hardware:** Intel Xeon and RISC-V CPU with vector extension
+- **Execution:** We recommend running the experiments in an isolated environment, as the results may vary if other processes are active.
+- **Metrics:** Execution time and number of reductions identified
+- **Output:** CSV files containing the normalized execution times, performance improvements, and console logs reporting the performance improvements.
+- **Experiments:** Docker image included in this artifact contains scripts to regenerate the results. Results may vary with respect to hardware parameters such as vector width, L1, L2 cache size, as the unroll-and jam-factor is hardware dependent.
+- **How much disk space required (approximately)?:** 80GB
+- **How much time is needed to complete experiments (approximately)?:** Dependent on the CPU and its operating frequency. Completing the full benchmark suite requires 15 - 20 mins on an Intel 13th Gen Intel(R) Core(TM) i7-13700K, 5.4 GHz with 64 GiB RAM
+- **Publicly available?:** Yes, see GitHub and AE Zenodo
+
+
+
+## Description
+
+### How delivered
+
+This artifact is available at Docker Hub
+
+### Hardware dependencies
+
+A machine with vector units is required. We evaluated on an Intel Xeon and Atrevido (RISC-V Core). OML-vect auto-vectorizes the code and improves performance. Performance improvement may vary with the hardware, therefore, we recommend similar platforms for reproducing the results.
+
+### Software dependencies
+
+Working Docker installation. This has been tested on a Linux x86 host machine with Docker v28.1.1. For RISC-V, we recommend Bianbu Star 2.1.7 or LINUX OS.
+
+To test the state-of-the-art tool ORT on the RISC-V platform, we used proprietary software Semidynamics ONNX-Runtime. The open source alternatives, such as the Python package (pip install OnnxRuntime), are not supported on RISC-V. Hence, while we used ORT as a point of comparison to our proposal, it cannot be installed on RISC-V without manual porting. This underlines the need for an automatic neural networks compiler for RISC-V, such as oml-vect.
+
+## Installation
+Download the docker image repository using the command:
+
+```bash
+docker pull shreyasubhash/omlvect:r1
+```
+
+Verify availability of the image:
+
+```bash
+docker images -a | grep "omlvect"
+```
+
+
+## Experiment workflow
+
+### x86
+
+To compile, run, and verify the results discussed in this paper, on host machine (x86 Intel), **navigate to the directory where the output should be stored** and run the command:
+
+```bash
+docker run -ti --volume ${PWD}:/workdir/shared \
+  shreyasubhash/omlvect:r1 \
+  bash -c "/workdir/scripts/infer.sh"
+```
+
+This command will compile the benchmarks, execute them (for x86), process the execution time and number of reductions identified for each kernel, and generate CSV files. The resulting CSV files can be accessed on the host machine.
+
+### RISC-V
+
+To cross-compile and generate binaries for RISC-V, run the command:
+
+```bash
+docker run -ti --volume \
+    ${PWD}:/workdir/shared  \
+    shreyasubhash/omlvect:r1 \
+    bash -c "/workdir/scripts/compile-riscv.sh"
+```
+
+This command will cross-compile all the benchmarks, and the statically linked ELFs will be available on the host machine `${PWD}/elf-rvv` along with `infer-rvv.sh` script to run the files on the RISC-V CPU and generate the corresponding CSV file.
+
+To obtain speedup measurements for the RISC-V platform, first copy the `runtime.csv` file generated on the RISC-V CPU into the `${PWD}` directory on the host system. Then execute the following command to process the results:
+
+```bash
+docker run -ti --volume \
+ ${PWD}:/workdir/shared \
+ shreyasubhash/omlvect:r1 \
+ bash -c "/workdir/scripts/get-rvv-speed-up.sh \
+ /workdir/shared/<your-file>.csv"
+```
+
+| Filename | Information |
+|----------|-------------|
+| Runtime.csv | Raw runtime |
+| normalised_runtime.csv | Normalised runtime compared to baseline (`onnx-mlir-no-cust-opts`) |
+| performance.csv | Percentage improvement in performance over the baseline |
+| reduction_counts.csv | Total number of reduction identified by MLIR and OML-vect |
+
+Details of all generated CSV files are shown in the table above for both x86 and RISC-V experiments.
+
+
+
+## Evaluation and expected results
+
+We expect OML-vect will autovectorize the code and reduce the execution time, but the performance improvements may vary across different hardware platforms, since the vector width and unroll-and-jam factor are hardware-dependent.
+
+## Reusability
+The following instructions summarize how to reproduce the OML-vect workflow. See the README file in the [GitHub repository](https://github.com/onnx/onnx-mlir) and the Docker image `shreyasubhash/omlvect:reusable`
+
+### OML-vect toolchain workflow
+
+Here we describe the full OML-vect workflow—from modifying the toolchain to generating and executing the final ELF.
+
+#### Code changes for OML-vect
+
+The following subsection details the complete OML-vect workflow, including the required toolchain updates, compilation steps, and execution of the resulting ELF.
+
+- Incorporate the revised MatMul algorithm in the file `src/Conversion/ONNXToKrnl/Math/MatMul.cpp`
+- Implement the reduction pass and invokes the MLIR vectorization pipeline in file `src/Conversion/KrnlToAffine/ConvertKrnlToAffine.cpp`
+
+Additional Scripts and other file modifications:
+
+- Preprocessing steps for data layout transformation are described in a separate section.
+- A CMake file enables cross-compilation when ONNX-MLIR runtime libraries are not available for the target hardware.
+
+Follow the build instructions in the [onnx-mlir repository](https://github.com/onnx/onnx-mlir) with modifications to files as mentioned above to compile **oml-vect**
+
+#### Data Layout Modification
+
+Run:
+
+```bash
+data-layout.sh <input onnx graph>
+```
+
+This command applies the data layout transformation to generate transposed MatMul's operand B.
+
+#### Get vectorized MLIR code
+
+Run:
+
+```bash
+<oml-vect-build-path>/bin/onnx-mlir -O3 \
+--vlen=<vector length> \
+  --uf1=<unroll factor k> \
+  --uf2=<unroll factor m> \
+  --uf3=<unroll factor n> \
+  --EmitLLVMIR <input.onnx>
+```
+
+This command integrates the updated MatMul algorithm, runs the reduction-mapping pass, and then invokes MLIR super-affine vectorization using the resulting reduction map to generate vectorized LLVM Dialect.
+
+#### Get LLVM IR
+
+Run:
+
+```bash
+/workdir/llvm-project/build-v20/bin/mlir-translate \
+  --mlir-to-llvmir <input.mlir> > <output.ll>
+```
+
+This command converts vectorized MLIR to LLVM IR.
+
+#### Optimize LLVM IR
+
+Run:
+
+```bash
+/workdir/llvm-project/build-v20/bin/opt -O3 -S \
+    <input.ll> -o <output.opt.ll>
+```
+
+This command applies LLVM IR O3 level optimizations
+
+#### Get asm code
+
+Run:
+
+```bash
+/workdir/llvm-project/build-v20/bin/llc -O3 \
+  -mcpu=<MCPU> --filetype=asm <input.opt.ll> \
+  -o <output.s>
+```
+
+This command generates architecture-specific assembly.
+
+#### Compile ONNX-MLIR runtime libs
+
+Set the property `CMAKE_C_COMPILER` in `oml-vect/runtime` to desired compiler for target Hardware and run:
+
+```bash
+cd oml-vect/runtime && cmake .
+```
+
+This command cross-compiles the runtime support libraries for the given target hardware required by ONNX-MLIR and OML-vect generated kernels.
+
+#### Get ELF for target hardware
+
+To generate ELF by linking assembly, runtime libraries, and main.cpp and other dependencies into the final ELF executable run:
+
+```bash
+./get-elf.sh <main.cpp> \
+    -march=<march> <asm_file.s>
+```
+
+#### Run the ELF
+
+Run:
+
+```bash
+./<output_elf> <input_tensor_as_numpy_array.c> <dim1*dim2*dim3*...>
+```
+
+### Portability Across Hardware
+Porting OML-vect to any new hardware requires no modifications to our methodology. One only needs to re-run Steps 6–9 with the target architecture’s -mcpu/-march values. Because OML-vect relies exclusively on LLVM, all LLVM-supported hardware targets are inherently supported.
+
+### Running New Benchmarks
+
+To add new benchmarks, it is sufficient to:
+
+- Re-execute the data-layout preprocessing to construct a new ONNX graph with the transposed B input
+- Run the provided script `run-infer.sh` using the new input tensors to run the inference using the command:
+
+```bash
+run-infer.sh <ELF name> \
+<input_tensor_as_numpy_array.c> \
+<dim1*dim2*dim3*...>
+```
+
+## Notes
+
+Depending on the host machine configuration, Docker commands might require elevated privileges (`sudo`). Shell scripts inside `${PWD}/shared/elf-rvv` folder may need execute permissions, run `(sudo) chmod +x filename`
