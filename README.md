@@ -171,7 +171,7 @@ The ONNX-MLIR code of conduct is described at https://onnx.ai/codeofconduct.html
 * The [onnx-mlir-serving](https://github.com/IBM/onnx-mlir-serving) project implements a GRPC server written with C++ to serve onnx-mlir compiled models. Benefiting from C++ implementation, ONNX Serving has very low latency overhead and high throughput.
 
 
-# Artifact Abstract
+# Artifact Abstract CGO 2026
 This is the supporting artifact for the paper titled "Enabling Automatic Compiler-Driven Vectorization of Transformers" as published in CGO 2026. It includes the source code for the proposed tool (oml-vect), along with scripts to compile and reproduce all experimental results presented in the paper. We provide a Docker image containing all necessary dependencies preinstalled, enabling straightforward setup and execution of the experiments. The setup supports running the experiments on an x86 host, and it also allows cross-compilation for RISC-V ISA, and it automatically transfers the statically linked RISC-V binaries to the host to be then copied to the RISC-V target via scp. The reported results were obtained on Intel Xeon an x86\_64 Intel(R) Xeon(R) E5-2630 v4 CPU @ 2.20GHz and a Xilinx U55C FPGA emulating an Atrevido 423 RISC-V 64-bit core with a 512-bit vector unit.
 
 # Artifact check-list (meta-information)
